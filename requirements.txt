@@ -1,2 +1,6 @@
-pydantic>=1.10.12
+pydantic
 numpy
+torch
+torchaudio
+tqdm
+torchlibrosa

@@ -1,0 +1,7 @@
+{
+  "dataset_path": "C:/Users/manhm/Desktop/Capstone_2026_Fish_Feeding_Intensity_DL/raw_dataset/U_FFIA",
+  "seed": 25,
+  "test_sample_per_class": 700,
+  "save_results": true,
+  "include_video": true
+}
