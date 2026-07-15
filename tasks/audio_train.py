@@ -272,7 +272,7 @@ class AudioTrainer(BaseTrainer):
         best_model_path = os.path.join(self.ckpt_dir, 'audio_best.pt')
         
         if os.path.exists(best_model_path):
-            checkpoint = torch.load(best_model_path, map_location=self.device)
+            checkpoint = torch.load(best_model_path, map_location=self.device, weights_only=False)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             logger.info(f"Reloaded best checkpoint model from Epoch {checkpoint['epoch']}...")
             
