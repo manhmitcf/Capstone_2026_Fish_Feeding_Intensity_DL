@@ -43,6 +43,9 @@ class HistoryLogger:
                 # Column headers including flattened confusion matrix elements
                 headers = [
                     'epoch', 
+                    'train_loss',
+                    'train_accuracy',
+                    'train_mAP',
                     'val_loss', 
                     'val_accuracy', 
                     'val_mAP',
@@ -70,12 +73,15 @@ class HistoryLogger:
             for idx, label in enumerate(labels):
                 writer.writerow([label] + list(matrix[idx]))
 
-    def log_epoch(self, epoch: int, val_loss: float, val_statistics: dict, is_best: bool = False) -> None:
+    def log_epoch(self, epoch: int, train_loss: float, train_acc: float, train_mAP: float, val_loss: float, val_statistics: dict, is_best: bool = False) -> None:
         """
         Record performance metrics for the current epoch and append to the history CSV file.
 
         Args:
             epoch (int): Current epoch number.
+            train_loss (float): Mean training loss value.
+            train_acc (float): Training accuracy value.
+            train_mAP (float): Training mean Average Precision.
             val_loss (float): Validation loss value.
             val_statistics (dict): Dictionary returned by AudioEvaluator.
             is_best (bool): True if current epoch represents the best validation performance. Default: False.
@@ -92,6 +98,9 @@ class HistoryLogger:
         # Write new row to history.csv
         row_data = [
             epoch,
+            f"{train_loss:.6f}",
+            f"{train_acc:.6f}",
+            f"{train_mAP:.6f}",
             f"{val_loss:.6f}",
             f"{val_acc:.6f}",
             f"{val_mAP:.6f}",

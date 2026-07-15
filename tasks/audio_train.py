@@ -155,6 +155,10 @@ class AudioTrainer(BaseTrainer):
             mean_loss = 0.0
             self.model.train()
             
+            # Lists to accumulate training predictions and targets for metric computation
+            train_preds = []
+            train_targets = []
+            
             if hasattr(train_loader.dataset, 'epoch'):
                 train_loader.dataset.epoch = epoch
 
@@ -181,8 +185,18 @@ class AudioTrainer(BaseTrainer):
                 mean_loss += loss_val
                 pbar.set_postfix({"Loss": f"{loss_val:.4f}"})
 
+                # Accumulate predictions and targets (detached from graph)
+                train_preds.append(output_dict['clipwise_output'].detach().cpu().numpy())
+                train_targets.append(target.cpu().numpy())
+
             epoch_loss = mean_loss / len(train_loader)
-            logger.info(f"Epoch {epoch}: Mean Training Loss = {epoch_loss:.5f}")
+            
+            # Compute epoch-level training metrics
+            train_preds = np.concatenate(train_preds, axis=0)
+            train_targets = np.concatenate(train_targets, axis=0)
+            train_acc = np.mean(np.argmax(train_targets, axis=1) == np.argmax(train_preds, axis=1))
+            from sklearn import metrics as sklearn_metrics
+            train_mAP = np.mean(sklearn_metrics.average_precision_score(train_targets, train_preds, average=None))
 
             # 5. Evaluate model performance on validation set
             self.model.eval()
@@ -201,7 +215,11 @@ class AudioTrainer(BaseTrainer):
                     val_loss_sum += self.loss_fn(val_out, {'target': val_targ}).item()
             val_loss = val_loss_sum / len(val_loader)
 
-            logger.info(f"Epoch {epoch}: Val Accuracy = {val_acc:.4f} | Val mAP = {val_mAP:.4f} | Val Loss = {val_loss:.5f}")
+            logger.info(
+                f"Epoch {epoch}: "
+                f"Train Loss = {epoch_loss:.5f} | Train Acc = {train_acc:.4f} | Train mAP = {train_mAP:.4f} | "
+                f"Val Loss = {val_loss:.5f} | Val Acc = {val_acc:.4f} | Val mAP = {val_mAP:.4f}"
+            )
 
             # Save optimal model checkpoint based on monitored metric
             is_best = False
@@ -226,7 +244,15 @@ class AudioTrainer(BaseTrainer):
                 self._save_checkpoint(best_model_path, epoch, val_acc if self.monitor == 'accuracy' else val_loss)
 
             # Record metrics and confusion matrix to history CSV
-            self.history_logger.log_epoch(epoch, val_loss, val_statistics, is_best=is_best)
+            self.history_logger.log_epoch(
+                epoch=epoch,
+                train_loss=epoch_loss,
+                train_acc=train_acc,
+                train_mAP=train_mAP,
+                val_loss=val_loss,
+                val_statistics=val_statistics,
+                is_best=is_best
+            )
 
             # Check early stopping conditions
             if self.early_stopping:

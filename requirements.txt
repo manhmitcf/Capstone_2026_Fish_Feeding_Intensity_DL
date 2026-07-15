@@ -5,3 +5,5 @@ torchaudio
 tqdm
 torchlibrosa
 scikit-learn
+soundfile
+torchcodec
