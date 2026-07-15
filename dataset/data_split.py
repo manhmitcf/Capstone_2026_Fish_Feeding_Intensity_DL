@@ -9,15 +9,14 @@ from typing import List, Dict, Tuple, Any
 import numpy as np
 from itertools import chain
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, Field
 
-# Cấu hình buộc stdout/stderr dùng mã hóa UTF-8 để không bị UnicodeEncodeError trên terminal Windows
+# Force stdout/stderr to use UTF-8 encoding to prevent UnicodeEncodeError on Windows terminals
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-# Cấu hình logging của Python
+# Configure Python logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -25,68 +24,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class SplitterConfig(BaseModel):
-    """
-    Lớp cấu hình sử dụng Pydantic để kiểm tra và xác thực dữ liệu đầu vào.
-    
-    Các tham số đầu vào (Input Parameters):
-        dataset_path (str): Đường dẫn tuyệt đối đến thư mục chứa dữ liệu gốc của U_FFIA.
-            Ví dụ: 'C:/raw_dataset/U_FFIA'
-        seed (int): Số nguyên dùng làm seed ngẫu nhiên để đảm bảo phân chia có thể tái lập.
-            Mặc định: 25. Ràng buộc: >= 0.
-        test_sample_per_class (int): Số lượng mẫu quy định cho mỗi class trong tập Test và tập Val.
-            Mặc định: 700. Ràng buộc: > 0.
-        save_results (bool): Biến cờ bật/tắt tự động lưu kết quả ra file.
-            Mặc định: True.
-        include_video (bool): Biến cờ quyết định có trả về đường dẫn video trong kết quả RAM hay không.
-            Nếu True: Trả về [audio_path, video_path, label].
-            If False: Trả về [audio_path, label].
-            Mặc định: False.
-    """
-    dataset_path: str = Field(
-        default='C:/Users/manhm/Desktop/Capstone_2026_Fish_Feeding_Intensity_DL/raw_dataset/U_FFIA',
-        description="Đường dẫn tuyệt đối đến thư mục chứa dữ liệu U_FFIA."
-    )
-    seed: int = Field(
-        default=25,
-        ge=0,
-        description="Seed ngẫu nhiên để đảm bảo khả năng tái lặp (phải >= 0)."
-    )
-    test_sample_per_class: int = Field(
-        default=700,
-        gt=0,
-        description="Số lượng mẫu cho tập Test/Val trên mỗi class (phải > 0)."
-    )
-    save_results: bool = Field(
-        default=True,
-        description="Quyết định tự động lưu kết quả ra file CSV, JSONL và JSON hay không."
-    )
-    include_video: bool = Field(
-        default=True,
-        description="Đầu ra trong RAM bao gồm cả đường dẫn video hay không."
-    )
-
-    @classmethod
-    def from_json(cls, path: str = 'config/dataset/splitter_config.json') -> 'SplitterConfig':
-        """
-        Tự động nạp cấu hình bộ chia dữ liệu từ file JSON.
-
-        Tham số đầu vào (Input):
-            path (str): Đường dẫn đến file JSON chứa cấu hình. Mặc định: 'config/dataset/splitter_config.json'
-
-        Tham số đầu ra (Output):
-            SplitterConfig: Đối tượng cấu hình đã được kiểm tra tính hợp lệ.
-        """
-        logger.info(f"Đang tải cấu hình bộ chia dữ liệu từ file JSON: '{path}'")
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return cls(**data)
+from config import SplitterConfig
 
 
 class BaseDataSplitter(ABC):
     """
-    Lớp cơ sở trừu tượng định nghĩa giao diện chia dataset và các tiện ích dùng chung.
-    Xử lý logic xuất file phân chia dùng chung (CSV, JSONL, summary JSON) cho các bộ chia.
+    Abstract base class defining the dataset splitting interface and shared utilities.
+    Handles common split export logic (CSV, JSONL, summary JSON) for all splitter implementations.
     """
     def __init__(self, config: SplitterConfig) -> None:
         self.config = config
@@ -96,14 +40,14 @@ class BaseDataSplitter(ABC):
         self.save_results = config.save_results
         self.include_video = config.include_video
 
-        # Tự động xác định đường dẫn thư mục audio (được dùng làm gốc phân chia mẫu)
+        # Automatically resolve the audio directory path (used as the root for sample splitting)
         audio_dir = os.path.join(self.dataset_path, 'audio')
         if os.path.isdir(audio_dir):
             self.audio_path = audio_dir
         else:
             self.audio_path = self.dataset_path
 
-        # Tự động xác định đường dẫn thư mục video
+        # Automatically resolve the video directory path
         video_dir = os.path.join(self.dataset_path, 'video')
         if os.path.isdir(video_dir):
             self.video_path = video_dir
@@ -111,7 +55,7 @@ class BaseDataSplitter(ABC):
         else:
             self.video_path = None
             self.video_exists = False
-            # Nếu người dùng yêu cầu video nhưng không có thư mục video, in cảnh báo và tự động hạ cấp
+            # If video was requested but no video directory exists, log a warning and auto-fallback
             if self.include_video:
                 logger.warning("==================================================")
                 logger.warning("Cảnh báo: Không tìm thấy thư mục 'video' trong dataset_path.")
@@ -122,57 +66,57 @@ class BaseDataSplitter(ABC):
     @abstractmethod
     def get_file_list(self, split_name: str) -> List[str]:
         """
-        Quét thư mục và trả về danh sách các đường dẫn file.
-        Bắt buộc các lớp con phải tự thực thi.
+        Scan the directory and return a list of file paths.
+        Must be implemented by subclasses.
 
-        Đầu vào (Input):
-            split_name (str): Tên của lớp cường độ cho ăn cần quét.
-                Ví dụ: 'strong', 'medium', 'weak', 'none'
+        Args:
+            split_name (str): The feeding intensity class name to scan.
+                Example: 'strong', 'medium', 'weak', 'none'
 
-        Đầu ra (Output):
-            List[str]: Danh sách chứa đường dẫn tuyệt đối của tất cả các file quét được.
+        Returns:
+            List[str]: A list of absolute paths of all scanned files.
         """
         pass
 
     @abstractmethod
     def split_data(self) -> Tuple[List[List], List[List], List[List]]:
         """
-        Thực hiện phân chia danh sách file thành các tập Train, Test và Validation.
-        Bắt buộc các lớp con phải tự thực thi.
+        Split the file lists into Train, Test, and Validation sets.
+        Must be implemented by subclasses.
 
-        Đầu vào (Input):
-            Không có tham số (Thông số lấy trực tiếp từ các thuộc tính lớp).
+        Args:
+            None (parameters are derived from class attributes).
 
-        Đầu ra (Output):
-            Tuple[List[List], List[List], List[List]]: Bộ ba chứa lần lượt 3 danh sách (Train, Test, Val).
+        Returns:
+            Tuple[List[List], List[List], List[List]]: A tuple containing three lists (Train, Test, Val).
         """
         pass
 
     @abstractmethod
     def _format_samples(self, split_name: str, data_list: List[List]) -> List[Dict[str, Any]]:
         """
-        Định dạng dữ liệu danh sách thành cấu trúc dictionary chuẩn để xuất file.
-        Bắt buộc các lớp con phải tự thực thi.
+        Format raw data lists into standardized dictionaries for file export.
+        Must be implemented by subclasses.
 
-        Đầu vào (Input):
-            split_name (str): Tên tập dữ liệu ('train', 'test', hoặc 'val').
-            data_list (List[List]): Danh sách các cặp dữ liệu ghép nhãn dạng [đường_dẫn, nhãn_số].
-        
-        Đầu ra (Output):
-            List[Dict[str, Any]]: Danh sách các dictionary chứa metadata chi tiết của mỗi mẫu.
+        Args:
+            split_name (str): The dataset split name ('train', 'test', or 'val').
+            data_list (List[List]): A list of label-paired data entries in [path, numeric_label] format.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing detailed metadata for each sample.
         """
         pass
 
     @staticmethod
     def _write_jsonl(samples: List[Dict[str, Any]], path: Path) -> None:
-        """Ghi danh sách mẫu dữ liệu ra file định dạng JSONL."""
+        """Write a list of data samples to a JSONL-formatted file."""
         with path.open("w", encoding="utf-8") as f:
             for sample in samples:
                 f.write(json.dumps(sample, ensure_ascii=False) + "\n")
 
     @staticmethod
     def _write_csv(samples: List[Dict[str, Any]], path: Path, fieldnames: List[str]) -> None:
-        """Ghi danh sách mẫu dữ liệu ra file định dạng CSV."""
+        """Write a list of data samples to a CSV-formatted file."""
         with path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
@@ -180,7 +124,7 @@ class BaseDataSplitter(ABC):
 
     def _save_splits(self, train_dict: List[List], test_dict: List[List], val_dict: List[List], output_dir: Path) -> None:
         """
-        Lưu các tập phân chia ra các file CSV, JSONL và file tóm tắt JSON (Thực thi dùng chung).
+        Save dataset splits to CSV, JSONL, and a summary JSON file (shared implementation).
         """
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -193,18 +137,18 @@ class BaseDataSplitter(ABC):
 
         formatted_splits: Dict[str, List[Dict[str, Any]]] = {}
 
-        # 1. Định dạng dữ liệu và lưu CSV/JSONL cho từng tập bằng thực thi của lớp con
+        # 1. Format data and save CSV/JSONL for each split using the subclass implementation
         for split_name, data_list in splits.items():
             samples = self._format_samples(split_name, data_list)
             formatted_splits[split_name] = samples
 
-            # Tiến hành ghi file
+            # Proceed to write output files
             fieldnames = ["video_path", "audio_path", "label", "class_name", "date", "session", "sample_id"]
             self._write_jsonl(samples, output_path / f"{split_name}.jsonl")
             self._write_csv(samples, output_path / f"{split_name}.csv", fieldnames=fieldnames)
             logger.info(f"Đã lưu thành công các file phân chia vào {output_path}")
 
-        # 2. Tạo và lưu file summary.json
+        # 2. Generate and save the summary.json file
         summary: Dict[str, Any] = {
             "label_map": {
                 "none": 0,
@@ -224,7 +168,7 @@ class BaseDataSplitter(ABC):
                 "by_class": counts
             }
 
-        # Bổ sung siêu dữ liệu cấu hình
+        # Append configuration metadata
         summary.update({
             "dataset_root": self.dataset_path,
             "output_dir": str(output_path),
@@ -239,13 +183,13 @@ class BaseDataSplitter(ABC):
 
 class FishDataSplitter(BaseDataSplitter):
     """
-    Lớp thực thi phân chia dữ liệu đa phương thức của cá (Âm thanh + Video).
-    Giữ nguyên logic quét file và chia tập từ fish_audio_dataset.py của U-FFIA.
-    Tự động liên kết video với audio và fallback sửa đường dẫn nếu copy từ máy khác qua.
+    Concrete implementation for multimodal fish data splitting (Audio + Video).
+    Preserves the original file scanning and splitting logic from U-FFIA's fish_audio_dataset.py.
+    Automatically links video to audio and applies path-fixing fallback for cross-machine transfers.
     """
     # noinspection DuplicatedCode
     def get_file_list(self, split_name: str) -> List[str]:
-        # Giữ nguyên logic hàm get_wav_name trong mã nguồn U-FFIA để quét dữ liệu gốc
+        # Preserve the original get_wav_name logic from U-FFIA source code for raw data scanning
         path = self.audio_path
         audio = []
         l1 = os.listdir(path)
@@ -257,7 +201,7 @@ class FishDataSplitter(BaseDataSplitter):
         return list(chain.from_iterable(audio))
 
     def _resolve_video_path(self, audio_path: str) -> str:
-        """Tự động tìm đường dẫn video tương ứng từ đường dẫn audio."""
+        """Automatically resolve the corresponding video path from an audio path."""
         parts = Path(audio_path).parts
         parts_list = list(parts)
         if "audio" in parts_list:
@@ -281,7 +225,7 @@ class FishDataSplitter(BaseDataSplitter):
         return ""
 
     def split_data(self) -> Tuple[List[List], List[List], List[List]]:
-        # Tự động xác định thư mục splits
+        # Automatically determine the splits directory
         if Path(self.dataset_path).name in ['audio', 'video']:
             splits_dir = Path(self.dataset_path).parent / 'splits'
         else:
@@ -303,7 +247,7 @@ class FishDataSplitter(BaseDataSplitter):
             need_rewrite_files = False
 
             try:
-                # Hàm helper đọc dữ liệu từ CSV và tự động sửa đường dẫn file kèm cơ chế gom log
+                # Helper function to load data from CSV and auto-fix file paths with batched logging
                 def load_and_fix_csv(csv_path: Path, split_name: str) -> List[List]:
                     nonlocal need_rewrite_files
                     loaded_data = []
@@ -311,7 +255,7 @@ class FishDataSplitter(BaseDataSplitter):
                     missing_count = 0
                     video_updated_count = 0
                     
-                    # Các biến dùng để log ví dụ một vài dòng sửa đổi thực tế
+                    # Variables for logging a few example path corrections
                     audio_fix_example = None
                     video_fix_example = None
                     
@@ -321,11 +265,11 @@ class FishDataSplitter(BaseDataSplitter):
                             raw_audio_path = row["audio_path"]
                             label = int(row["label"])
                             
-                            # Nếu đường dẫn audio không tồn tại, tự động sửa đổi
+                            # If the audio path does not exist, attempt automatic path correction
                             if not os.path.exists(raw_audio_path):
                                 parts = Path(raw_audio_path).parts
                                 if len(parts) >= 4:
-                                    # Khôi phục đường dẫn audio tuyệt đối dựa trên thư mục hiện tại
+                                    # Reconstruct the absolute audio path based on the current directory
                                     fixed_path = os.path.join(self.audio_path, parts[-4], parts[-3], parts[-2], parts[-1])
                                     if os.path.exists(fixed_path):
                                         if audio_fix_example is None:
@@ -336,7 +280,7 @@ class FishDataSplitter(BaseDataSplitter):
                                     else:
                                         missing_count += 1
                             
-                            # Khôi phục và kiểm tra tính tồn tại của video_path
+                            # Reconstruct and verify the existence of video_path
                             video_path_str = row.get("video_path", "")
                             if video_path_str and not os.path.exists(video_path_str):
                                 parts_v = Path(video_path_str).parts
@@ -348,10 +292,10 @@ class FishDataSplitter(BaseDataSplitter):
                                         video_path_str = fixed_video
                                         need_rewrite_files = True
                                     else:
-                                        # Thử tự tìm lại video theo file audio
+                                        # Attempt to re-resolve the video path from the audio file
                                         video_path_str = self._resolve_video_path(raw_audio_path)
                             elif not video_path_str:
-                                # Trường hợp file split cũ không có video_path (rỗng "") nhưng hiện tại folder video đã có
+                                # Case where legacy split files have no video_path (empty "") but video folder now exists
                                 resolved_v = self._resolve_video_path(raw_audio_path)
                                 if resolved_v:
                                     if video_fix_example is None:
@@ -360,13 +304,13 @@ class FishDataSplitter(BaseDataSplitter):
                                     video_updated_count += 1
                                     need_rewrite_files = True
 
-                            # Trả về định dạng tùy thuộc cấu hình include_video
+                            # Return format depends on the include_video configuration
                             if self.include_video:
                                 loaded_data.append([raw_audio_path, video_path_str, label])
                             else:
                                 loaded_data.append([raw_audio_path, label])
                     
-                    # In log chi tiết
+                    # Print detailed logs
                     if fixed_count > 0:
                         logger.info(f"Tập {split_name}: Tự động phát hiện và sửa đổi thành công {fixed_count} đường dẫn audio sai lệch.")
                         if audio_fix_example:
@@ -389,7 +333,7 @@ class FishDataSplitter(BaseDataSplitter):
                 logger.info(f"- Tổng số mẫu tập Test:  {len(test_dict)}")
                 logger.info(f"- Tổng số mẫu tập Val:   {len(val_dict)}")
                 
-                # In thông tin các mẫu đầu tiên để người dùng dễ kiểm tra
+                # Print first samples for user verification
                 if len(train_dict) > 0:
                     logger.info(f"  * Mẫu Train đầu tiên được nạp: {train_dict[0]}")
                 if len(test_dict) > 0:
@@ -397,7 +341,7 @@ class FishDataSplitter(BaseDataSplitter):
                 if len(val_dict) > 0:
                     logger.info(f"  * Mẫu Val đầu tiên được nạp:   {val_dict[0]}")
                 
-                # Nếu có bất kỳ đường dẫn nào bị sửa đổi hoặc cập nhật video mới, tiến hành ghi đè lại file trên đĩa để đồng bộ
+                # If any paths were corrected or new video paths added, overwrite split files on disk to synchronize
                 if need_rewrite_files:
                     logger.info("Đang tự động cập nhật và ghi đè lại các tệp tin phân chia trên đĩa để đồng bộ các thay đổi...")
                     self._save_splits(train_dict, test_dict, val_dict, splits_dir)
@@ -417,7 +361,7 @@ class FishDataSplitter(BaseDataSplitter):
         logger.info(f"RAM bao gồm video path: {self.include_video}")
         logger.info("==================================================")
 
-        # Quét tệp tin và ghi nhận logs số lượng
+        # Scan files and log the counts
         logger.info("Đang quét danh sách file âm thanh cho từng class...")
         strong_list = self.get_file_list(split_name='strong')
         logger.info(f"Class 'strong': Tìm thấy {len(strong_list)} files.")
@@ -431,7 +375,7 @@ class FishDataSplitter(BaseDataSplitter):
         none_list = self.get_file_list(split_name='none')
         logger.info(f"Class 'none': Tìm thấy {len(none_list)} files.")
 
-        # Xáo trộn danh sách độc lập
+        # Shuffle each class list independently
         logger.info(f"Đang tiến hành xáo trộn (shuffle) danh sách độc lập với seed={self.seed}...")
         random_state = np.random.RandomState(self.seed)
         random_state.shuffle(strong_list)
@@ -439,7 +383,7 @@ class FishDataSplitter(BaseDataSplitter):
         random_state.shuffle(weak_list)
         random_state.shuffle(none_list)
 
-        # Thực hiện phân chia các tập
+        # Perform dataset splitting
         logger.info("Đang tiến hành phân chia (slicing) các tập dữ liệu...")
         strong_test = strong_list[:self.test_sample_per_class]
         medium_test = medium_list[:self.test_sample_per_class]
@@ -456,20 +400,20 @@ class FishDataSplitter(BaseDataSplitter):
         weak_train = weak_list[2*self.test_sample_per_class:]
         none_train = none_list[2*self.test_sample_per_class:]
 
-        # Cảnh báo nếu không đủ dữ liệu chia
+        # Warn if there are insufficient samples for splitting
         for class_name, size in [('strong', len(strong_list)), ('medium', len(medium_list)), ('weak', len(weak_list)), ('none', len(none_list))]:
             req_samples = 2 * self.test_sample_per_class
             if size < req_samples:
                 logger.warning(f"Class '{class_name}' chỉ có {size} files, trong khi cần tối thiểu {req_samples} samples để chia Test và Val.")
 
-        # Ghi log chi tiết kích thước phân chia
+        # Log detailed split sizes per class
         logger.info(f"Chi tiết phân chia mỗi class:")
         logger.info(f"       - class 'strong': Train={len(strong_train)}, Test={len(strong_test)}, Val={len(strong_val)}")
         logger.info(f"       - class 'medium': Train={len(medium_train)}, Test={len(medium_test)}, Val={len(medium_val)}")
         logger.info(f"       - class 'weak':   Train={len(weak_train)}, Test={len(weak_test)}, Val={len(weak_val)}")
         logger.info(f"       - class 'none':   Train={len(none_train)}, Test={len(none_test)}, Val={len(none_val)}")
 
-        # Ánh xạ nhãn và gộp danh sách bằng list comprehension
+        # Map integer labels and merge lists using list comprehension
         logger.info("Đang ánh xạ nhãn số nguyên và tạo danh sách tập dữ liệu...")
         if self.include_video:
             train_dict = (
@@ -510,7 +454,7 @@ class FishDataSplitter(BaseDataSplitter):
                 [[wav, 0] for wav in none_val]
             )
 
-        # Xáo trộn lại tập Train
+        # Final shuffle of the Train set
         logger.info("Xáo trộn (shuffle) lần cuối cho tập dữ liệu Train...")
         random_state.shuffle(train_dict)
 
@@ -520,7 +464,7 @@ class FishDataSplitter(BaseDataSplitter):
         logger.info(f"- Tổng số mẫu tập Test:  {len(test_dict)}")
         logger.info(f"- Tổng số mẫu tập Val:   {len(val_dict)}")
         
-        # In ví dụ các phần tử đầu tiên để người dùng dễ kiểm tra
+        # Print first samples for user verification
         if len(train_dict) > 0:
             logger.info(f"  * Mẫu Train đầu tiên được sinh: {train_dict[0]}")
         if len(test_dict) > 0:
@@ -529,18 +473,18 @@ class FishDataSplitter(BaseDataSplitter):
             logger.info(f"  * Mẫu Val đầu tiên được sinh:   {val_dict[0]}")
         logger.info("==================================================")
 
-        # Tự động lưu kết quả vào thư mục splits song song với dataset_path nếu save_results là True
+        # Automatically save results to the splits directory alongside dataset_path if save_results is True
         if self.save_results:
             self._save_splits(train_dict, test_dict, val_dict, splits_dir)
 
         return train_dict, test_dict, val_dict
 
     def _format_samples(self, split_name: str, data_list: List[List]) -> List[Dict[str, Any]]:
-        """Phần tách thông tin mẫu thành các dictionary chuẩn để ghi file, tự động liên kết video."""
+        """Parse sample information into standardized dictionaries for file export, with automatic video linking."""
         label_to_class = {0: "none", 1: "strong", 2: "medium", 3: "weak"}
         samples = []
         for item in data_list:
-            # Hỗ trợ cả 2 định dạng: mảng 2 phần tử [audio_path, label] hoặc mảng 3 phần tử [audio_path, video_path, label]
+            # Support both formats: 2-element array [audio_path, label] or 3-element array [audio_path, video_path, label]
             if len(item) == 3:
                 wav_path = item[0]
                 video_path_str = item[1]
@@ -550,7 +494,7 @@ class FishDataSplitter(BaseDataSplitter):
                 label = item[1]
                 video_path_str = self._resolve_video_path(wav_path)
 
-            # Phân tách ngày, phiên (session) và sample_id từ đường dẫn tuyệt đối
+            # Extract date, session, and sample_id from the absolute path
             parts = Path(wav_path).parts
             date_part = parts[-4] if len(parts) >= 4 else ""
             session_part = parts[-3] if len(parts) >= 3 else ""
@@ -568,19 +512,20 @@ class FishDataSplitter(BaseDataSplitter):
             })
         return samples
 
-
-# Thực thi chính nếu chạy trực tiếp file này (chỉ để tham khảo cách sử dụng)
+# Main execution block for standalone usage reference
 if __name__ == '__main__':
-    # Hướng dẫn sử dụng FishDataSplitter trong mã nguồn Python:
+    # Usage example for FishDataSplitter in Python:
     # 
-    # từ dataset import SplitterConfig, FishDataSplitter
+    # from config import TrainConfig, SplitterConfig
+    # from dataset import FishDataSplitter
     # 
-    # 1. Nạp cấu hình tự động từ file JSON mặc định:
-    # config = SplitterConfig.from_json()
+    # 1. Load splitter config from unified train_config.json:
+    # config = TrainConfig.from_json('config/train_config.json')
+    # splitter_cfg = config.dataset_splitter
     # 
-    # 2. Khởi tạo bộ phân chia dữ liệu:
-    # splitter = FishDataSplitter(config=config)
+    # 2. Initialize the data splitter:
+    # splitter = FishDataSplitter(config=splitter_cfg)
     # 
-    # 3. Tiến hành phân chia và nhận các danh sách tập dữ liệu trong RAM:
+    # 3. Split data and receive dataset lists in RAM:
     # train_data, test_data, val_data = splitter.split_data()
     pass
