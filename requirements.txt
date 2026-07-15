@@ -4,3 +4,4 @@ torch
 torchaudio
 tqdm
 torchlibrosa
+scikit-learn
