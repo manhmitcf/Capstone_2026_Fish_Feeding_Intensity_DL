@@ -130,7 +130,7 @@ class AudioEvaluator(BaseEvaluator):
         cm = confusion_matrix(target_acc, clipwise_output_acc)
 
         # 6. Generate detailed text classification report
-        message = classification_report(target_acc, clipwise_output_acc)
+        message = classification_report(target_acc, clipwise_output_acc, zero_division=0)
         message = '\n' + message
 
         # 7. Compute weighted and macro precision, recall, f1-score for reporting
