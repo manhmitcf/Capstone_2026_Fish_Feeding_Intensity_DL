@@ -54,6 +54,7 @@ class Cnn6(BaseBackbone):
     """
     def __init__(self, classes_num: int = 4, mel_bins: int = 128) -> None:
         super(Cnn6, self).__init__()
+        self.model_name = "cnn6"
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
         self.conv_block1 = ConvBlock5x5(in_channels=1, out_channels=64)

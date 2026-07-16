@@ -44,8 +44,22 @@ class BaseTrainer:
         self.model = model
         self.optimizer = optimizer
         self.device = device
-        self.ckpt_dir = ckpt_dir
-        os.makedirs(ckpt_dir, exist_ok=True)
+        
+        # Determine model name for the checkpoint directory
+        model_name = "model"
+        if hasattr(model, 'backbone') and hasattr(model.backbone, 'get_name'):
+            model_name = model.backbone.get_name()
+        
+        # Ensure base directory is not empty
+        base_dir = ckpt_dir if ckpt_dir else "checkpoint"
+        
+        # Append model name as a folder inside base_dir if not already ending with it
+        if not base_dir.rstrip('/\\').endswith(model_name):
+            self.ckpt_dir = os.path.join(base_dir, model_name)
+        else:
+            self.ckpt_dir = base_dir
+            
+        os.makedirs(self.ckpt_dir, exist_ok=True)
 
     def train(self, train_loader: Any, val_loader: Any, test_loader: Any, max_epoch: int) -> None:
         """
@@ -87,21 +101,21 @@ class AudioTrainer(BaseTrainer):
         else:
             self.early_stopper = None
 
-        # Initialize HistoryLogger for exporting training progression
-        self.history_logger = HistoryLogger(log_dir=ckpt_dir)
+        # Initialize HistoryLogger for exporting training progression (using model-specific self.ckpt_dir)
+        self.history_logger = HistoryLogger(log_dir=self.ckpt_dir)
 
         # Automatically copy config files to checkpoint directory for experiment tracking
         import shutil
         import json
         try:
             # 1. Copy the full train_config.json
-            shutil.copy(train_config_path, os.path.join(ckpt_dir, 'train_config.json'))
+            shutil.copy(train_config_path, os.path.join(self.ckpt_dir, 'train_config.json'))
             
             # 2. Extract and save splitter_config.json for compatibility
             from config import TrainConfig
             config_obj = TrainConfig.from_json(train_config_path)
             splitter_data = config_obj.dataset_splitter.model_dump()
-            with open(os.path.join(ckpt_dir, 'splitter_config.json'), 'w', encoding='utf-8') as f:
+            with open(os.path.join(self.ckpt_dir, 'splitter_config.json'), 'w', encoding='utf-8') as f:
                 json.dump(splitter_data, f, indent=2)
             logger.info("Successfully backed up active configurations to checkpoint directory.")
         except Exception as e:

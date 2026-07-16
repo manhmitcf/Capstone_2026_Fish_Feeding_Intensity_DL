@@ -62,6 +62,7 @@ class PANNS_Cnn14(BaseBackbone):
     """
     def __init__(self, classes_num: int = 4) -> None:
         super(PANNS_Cnn14, self).__init__()
+        self.model_name = "panns_cnn14"
         self.conv_block1 = ConvBlock(in_channels=1, out_channels=64)
         self.conv_block2 = ConvBlock(in_channels=64, out_channels=128)
         self.conv_block3 = ConvBlock(in_channels=128, out_channels=256)

@@ -102,6 +102,7 @@ class BC_ResNet(BaseBackbone):
     """
     def __init__(self, classes_num: int = 4, norm: bool = False) -> None:
         super(BC_ResNet, self).__init__()
+        self.model_name = "bc_resnet"
         c = 40
         self.conv1 = nn.Conv2d(1, 2 * c, 5, stride=(2, 2), padding=(2, 2))
         self.block1_1 = TransitionBlock(2 * c, c)

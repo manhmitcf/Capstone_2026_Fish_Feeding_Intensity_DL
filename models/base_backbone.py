@@ -11,6 +11,13 @@ class BaseBackbone(nn.Module):
     """
     def __init__(self) -> None:
         super(BaseBackbone, self).__init__()
+        self.model_name = "base_backbone"
+
+    def get_name(self) -> str:
+        """
+        Retrieve the name of the backbone model architecture.
+        """
+        return self.model_name
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

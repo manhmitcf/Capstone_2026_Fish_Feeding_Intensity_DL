@@ -158,6 +158,7 @@ class Cnn14MobileV2(BaseBackbone):
     """
     def __init__(self, classes_num: int = 4) -> None:
         super(Cnn14MobileV2, self).__init__()
+        self.model_name = "cnn14_mobilev2"
 
         self.conv_block1 = Mobilev2Block(in_channels=1, out_channels=16)
         self.conv_block2 = Mobilev2Block(in_channels=16, out_channels=32)
