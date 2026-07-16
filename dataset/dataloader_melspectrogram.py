@@ -93,12 +93,20 @@ class FishVoiceDataLoader:
     @staticmethod
     def load_audio(path: str, sr: int = 64000) -> torch.Tensor:
         """
-        Load audio file and resample to the target sample rate.
+        Load audio file using librosa, resample to the target sample rate,
+        and force a fixed length of 2 seconds (clipping/padding).
         """
-        waveform, sample_rate = torchaudio.load(path)
-        resample_transform = torchaudio.transforms.Resample(sample_rate, sr)
-        resample_waveform = resample_transform(waveform)
-        return resample_waveform
+        import librosa
+        y, _ = librosa.load(path, sr=sr)
+        target_length = sr * 2  # 2 seconds
+        
+        # Clip if longer, zero-pad if shorter
+        if len(y) > target_length:
+            y = y[:target_length]
+        elif len(y) < target_length:
+            y = np.pad(y, (0, target_length - len(y)), mode='constant')
+            
+        return torch.from_numpy(y.astype(np.float32))
 
     @staticmethod
     def collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
