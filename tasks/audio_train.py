@@ -150,6 +150,7 @@ class AudioTrainer(BaseTrainer):
         logger.info(f"Starting training pipeline (Monitor metric: {self.monitor})...")
         best_acc = 0.0
         best_mAP = 0.0
+        best_loss = float('inf')
         best_epoch = 0
         best_val_statistics = None
 
@@ -252,6 +253,7 @@ class AudioTrainer(BaseTrainer):
                 best_epoch = epoch
                 best_acc = val_acc
                 best_mAP = val_mAP
+                best_loss = val_loss
                 best_val_statistics = val_statistics
                 best_model_path = os.path.join(self.ckpt_dir, 'audio_best.pt')
                 
@@ -274,7 +276,7 @@ class AudioTrainer(BaseTrainer):
                     break
 
             logger.info(
-                f"Current best: Epoch {best_epoch} | Accuracy: {best_acc:.4f} | mAP: {best_mAP:.4f}"
+                f"Current best: Epoch {best_epoch} | Loss: {best_loss:.5f} | Accuracy: {best_acc:.4f} | mAP: {best_mAP:.4f}"
             )
 
         # Calculate final training time in seconds
