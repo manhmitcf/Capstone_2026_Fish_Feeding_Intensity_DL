@@ -199,6 +199,7 @@ class HistoryLogger:
         # Setup headless matplotlib backend for remote/docker compatibility
         import matplotlib
         matplotlib.use('Agg')
+        logging.getLogger('matplotlib').setLevel(logging.WARNING)
         import matplotlib.pyplot as plt
 
         # Create a beautiful 3-panel figure
