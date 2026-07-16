@@ -160,3 +160,80 @@ class HistoryLogger:
                 writer.writerow(headers)
             writer.writerow(row_data)
         logger.info(f"Successfully exported Summary Report to: '{summary_csv_path}'")
+
+    def plot_history(self) -> None:
+        """
+        Generate and save a 3-panel learning curve plot (Loss, Accuracy, mAP) from the history CSV.
+        """
+        if not os.path.exists(self.history_csv_path):
+            logger.warning(f"Warning: History file '{self.history_csv_path}' does not exist. Cannot plot curves.")
+            return
+
+        epochs = []
+        train_losses, val_losses = [], []
+        train_accs, val_accs = [], []
+        train_maps, val_maps = [], []
+
+        # Read history data from CSV
+        with open(self.history_csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    epochs.append(int(row['epoch']))
+                    train_losses.append(float(row['train_loss']))
+                    val_losses.append(float(row['val_loss']))
+                    train_accs.append(float(row['train_accuracy']))
+                    val_accs.append(float(row['val_accuracy']))
+                    train_maps.append(float(row['train_mAP']))
+                    val_maps.append(float(row['val_mAP']))
+                except KeyError as e:
+                    logger.warning(f"Warning: Missing column in history CSV when plotting: {str(e)}")
+                    return
+                except ValueError:
+                    continue  # Skip row on format errors
+
+        if not epochs:
+            logger.warning("Warning: No epoch data found to plot.")
+            return
+
+        # Setup headless matplotlib backend for remote/docker compatibility
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        # Create a beautiful 3-panel figure
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        fig.suptitle('Fish Feeding Intensity Model Training History', fontsize=16, fontweight='bold', y=0.98)
+
+        # 1. Loss Panel
+        axes[0].plot(epochs, train_losses, label='Train Loss', color='#1f77b4', linewidth=2, linestyle='--')
+        axes[0].plot(epochs, val_losses, label='Val Loss', color='#ff7f0e', linewidth=2)
+        axes[0].set_title('Loss Curves', fontsize=12, fontweight='bold')
+        axes[0].set_xlabel('Epoch', fontsize=10)
+        axes[0].set_ylabel('Loss', fontsize=10)
+        axes[0].grid(True, linestyle=':', alpha=0.6)
+        axes[0].legend(frameon=True)
+
+        # 2. Accuracy Panel
+        axes[1].plot(epochs, train_accs, label='Train Acc', color='#2ca02c', linewidth=2, linestyle='--')
+        axes[1].plot(epochs, val_accs, label='Val Acc', color='#d62728', linewidth=2)
+        axes[1].set_title('Accuracy Curves', fontsize=12, fontweight='bold')
+        axes[1].set_xlabel('Epoch', fontsize=10)
+        axes[1].set_ylabel('Accuracy', fontsize=10)
+        axes[1].grid(True, linestyle=':', alpha=0.6)
+        axes[1].legend(frameon=True)
+
+        # 3. mAP Panel
+        axes[2].plot(epochs, train_maps, label='Train mAP', color='#9467bd', linewidth=2, linestyle='--')
+        axes[2].plot(epochs, val_maps, label='Val mAP', color='#8c564b', linewidth=2)
+        axes[2].set_title('Mean Average Precision (mAP)', fontsize=12, fontweight='bold')
+        axes[2].set_xlabel('Epoch', fontsize=10)
+        axes[2].set_ylabel('mAP', fontsize=10)
+        axes[2].grid(True, linestyle=':', alpha=0.6)
+        axes[2].legend(frameon=True)
+
+        plt.tight_layout()
+        plot_path = os.path.join(self.log_dir, 'training_curves.png')
+        plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        logger.info(f"Successfully generated and saved training curves to: '{plot_path}'")

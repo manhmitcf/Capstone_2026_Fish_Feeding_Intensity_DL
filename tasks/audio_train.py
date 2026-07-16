@@ -266,6 +266,12 @@ class AudioTrainer(BaseTrainer):
         # Calculate final training time in seconds
         training_time = time.perf_counter() - train_start_time
 
+        # Generate training curves plot
+        try:
+            self.history_logger.plot_history()
+        except Exception as e:
+            logger.warning(f"Warning: Failed to generate training curves plot: {str(e)}")
+
         # 6. Run final evaluation on test set using best checkpoint
         logger.info("==================================================")
         logger.info("Training complete. Starting evaluation on Test split...")

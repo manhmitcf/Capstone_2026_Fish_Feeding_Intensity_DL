@@ -6,4 +6,6 @@ tqdm
 torchlibrosa
 scikit-learn
 soundfile
-torchcodec
+torchcodec
+matplotlib
+
