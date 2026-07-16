@@ -126,12 +126,16 @@ class HistoryLogger:
         # Check if file exists to write headers
         file_exists = os.path.exists(summary_csv_path)
         
+        # Compute mAP Val and Test
+        val_mAP = np.mean(val_statistics['average_precision'])
+        test_mAP = np.mean(test_statistics['average_precision'])
+
         headers = [
             'Training Time (s)',
             'Inference Time (ms/sample)',
-            'Precision Val (Weighted)', 'Recall Val (Weighted)', 'F1-score Val (Weighted)', 'Accuracy Val',
+            'Precision Val (Weighted)', 'Recall Val (Weighted)', 'F1-score Val (Weighted)', 'Accuracy Val', 'mAP Val',
             'Precision Val (Macro)', 'Recall Val (Macro)', 'F1-score Val (Macro)',
-            'Precision Test (Weighted)', 'Recall Test (Weighted)', 'F1-score Test (Weighted)', 'Accuracy Test',
+            'Precision Test (Weighted)', 'Recall Test (Weighted)', 'F1-score Test (Weighted)', 'Accuracy Test', 'mAP Test',
             'Precision Test (Macro)', 'Recall Test (Macro)', 'F1-score Test (Macro)'
         ]
         
@@ -142,6 +146,7 @@ class HistoryLogger:
             f"{val_statistics['rec_weighted']:.6f}",
             f"{val_statistics['f1_weighted']:.6f}",
             f"{val_statistics['accuracy']:.6f}",
+            f"{val_mAP:.6f}",
             f"{val_statistics['prec_macro']:.6f}",
             f"{val_statistics['rec_macro']:.6f}",
             f"{val_statistics['f1_macro']:.6f}",
@@ -149,6 +154,7 @@ class HistoryLogger:
             f"{test_statistics['rec_weighted']:.6f}",
             f"{test_statistics['f1_weighted']:.6f}",
             f"{test_statistics['accuracy']:.6f}",
+            f"{test_mAP:.6f}",
             f"{test_statistics['prec_macro']:.6f}",
             f"{test_statistics['rec_macro']:.6f}",
             f"{test_statistics['f1_macro']:.6f}"
